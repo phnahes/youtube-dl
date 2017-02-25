@@ -1,34 +1,31 @@
 # coding: utf-8
 from __future__ import unicode_literals
 
-import codecs
 import re
 
 from .common import InfoExtractor
-from ..compat import compat_urllib_parse
 from ..utils import (
     ExtractorError,
     int_or_none,
     sanitized_Request,
+    urlencode_postdata,
 )
 
 
 class TubiTvIE(InfoExtractor):
-    _VALID_URL = r'https?://(?:www\.)?tubitv\.com/video\?id=(?P<id>[0-9]+)'
+    _VALID_URL = r'https?://(?:www\.)?tubitv\.com/video/(?P<id>[0-9]+)'
     _LOGIN_URL = 'http://tubitv.com/login'
     _NETRC_MACHINE = 'tubitv'
+    _GEO_COUNTRIES = ['US']
     _TEST = {
-        'url': 'http://tubitv.com/video?id=54411&title=The_Kitchen_Musical_-_EP01',
+        'url': 'http://tubitv.com/video/283829/the_comedian_at_the_friday',
+        'md5': '43ac06be9326f41912dc64ccf7a80320',
         'info_dict': {
-            'id': '54411',
+            'id': '283829',
             'ext': 'mp4',
-            'title': 'The Kitchen Musical - EP01',
-            'thumbnail': 're:^https?://.*\.png$',
-            'description': 'md5:37532716166069b353e8866e71fefae7',
-            'duration': 2407,
-        },
-        'params': {
-            'skip_download': 'HLS download',
+            'title': 'The Comedian at The Friday',
+            'description': 'A stand up comedian is forced to look at the decisions in his life while on a one week trip to the west coast.',
+            'uploader_id': 'bc168bee0d18dd1cb3b86c68706ab434',
         },
     }
 
@@ -41,7 +38,7 @@ class TubiTvIE(InfoExtractor):
             'username': username,
             'password': password,
         }
-        payload = compat_urllib_parse.urlencode(form_data).encode('utf-8')
+        payload = urlencode_postdata(form_data)
         request = sanitized_Request(self._LOGIN_URL, payload)
         request.add_header('Content-Type', 'application/x-www-form-urlencoded')
         login_page = self._download_webpage(
@@ -55,26 +52,39 @@ class TubiTvIE(InfoExtractor):
 
     def _real_extract(self, url):
         video_id = self._match_id(url)
+        video_data = self._download_json(
+            'http://tubitv.com/oz/videos/%s/content' % video_id, video_id)
+        title = video_data['title']
 
-        webpage = self._download_webpage(url, video_id)
-        if re.search(r"<(?:DIV|div) class='login-required-screen'>", webpage):
-            self.raise_login_required('This video requires login')
+        formats = self._extract_m3u8_formats(
+            self._proto_relative_url(video_data['url']),
+            video_id, 'mp4', 'm3u8_native')
+        self._sort_formats(formats)
 
-        title = self._og_search_title(webpage)
-        description = self._og_search_description(webpage)
-        thumbnail = self._og_search_thumbnail(webpage)
-        duration = int_or_none(self._html_search_meta(
-            'video:duration', webpage, 'duration'))
+        thumbnails = []
+        for thumbnail_url in video_data.get('thumbnails', []):
+            if not thumbnail_url:
+                continue
+            thumbnails.append({
+                'url': self._proto_relative_url(thumbnail_url),
+            })
 
-        apu = self._search_regex(r"apu='([^']+)'", webpage, 'apu')
-        m3u8_url = codecs.decode(apu, 'rot_13')[::-1]
-        formats = self._extract_m3u8_formats(m3u8_url, video_id, ext='mp4')
+        subtitles = {}
+        for sub in video_data.get('subtitles', []):
+            sub_url = sub.get('url')
+            if not sub_url:
+                continue
+            subtitles.setdefault(sub.get('lang', 'English'), []).append({
+                'url': self._proto_relative_url(sub_url),
+            })
 
         return {
             'id': video_id,
             'title': title,
             'formats': formats,
-            'thumbnail': thumbnail,
-            'description': description,
-            'duration': duration,
+            'subtitles': subtitles,
+            'thumbnails': thumbnails,
+            'description': video_data.get('description'),
+            'duration': int_or_none(video_data.get('duration')),
+            'uploader_id': video_data.get('publisher_id'),
         }

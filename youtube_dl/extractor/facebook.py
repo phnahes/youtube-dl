@@ -1,6 +1,6 @@
+# coding: utf-8
 from __future__ import unicode_literals
 
-import json
 import re
 import socket
 
@@ -13,13 +13,16 @@ from ..compat import (
     compat_urllib_parse_unquote_plus,
 )
 from ..utils import (
+    clean_html,
     error_to_compat_str,
     ExtractorError,
+    get_element_by_id,
+    int_or_none,
+    js_to_json,
     limit_length,
     sanitized_Request,
+    try_get,
     urlencode_postdata,
-    get_element_by_id,
-    clean_html,
 )
 
 
@@ -27,7 +30,7 @@ class FacebookIE(InfoExtractor):
     _VALID_URL = r'''(?x)
                 (?:
                     https?://
-                        (?:\w+\.)?facebook\.com/
+                        (?:[\w-]+\.)?(?:facebook\.com|facebookcorewwwi\.onion)/
                         (?:[^#]*?\#!/)?
                         (?:
                             (?:
@@ -37,7 +40,9 @@ class FacebookIE(InfoExtractor):
                                 video/embed|
                                 story\.php
                             )\?(?:.*?)(?:v|video_id|story_fbid)=|
-                            [^/]+/videos/(?:[^/]+/)?
+                            [^/]+/videos/(?:[^/]+/)?|
+                            [^/]+/posts/|
+                            groups/[^/]+/permalink/
                         )|
                     facebook:
                 )
@@ -50,6 +55,8 @@ class FacebookIE(InfoExtractor):
 
     _CHROME_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.97 Safari/537.36'
 
+    _VIDEO_PAGE_TEMPLATE = 'https://www.facebook.com/video/video.php?v=%s'
+
     _TESTS = [{
         'url': 'https://www.facebook.com/video.php?v=637842556329505&fref=nf',
         'md5': '6a40d33c0eccbb1af76cf0485a052659',
@@ -58,6 +65,8 @@ class FacebookIE(InfoExtractor):
             'ext': 'mp4',
             'title': 're:Did you know Kei Nishikori is the first Asian man to ever reach a Grand Slam',
             'uploader': 'Tennis on Facebook',
+            'upload_date': '20140908',
+            'timestamp': 1410199200,
         }
     }, {
         'note': 'Video without discernible title',
@@ -65,8 +74,10 @@ class FacebookIE(InfoExtractor):
         'info_dict': {
             'id': '274175099429670',
             'ext': 'mp4',
-            'title': 'Facebook video #274175099429670',
+            'title': 'Asif Nawab Butt posted a video to his Timeline.',
             'uploader': 'Asif Nawab Butt',
+            'upload_date': '20140506',
+            'timestamp': 1399398998,
         },
         'expected_warnings': [
             'title'
@@ -74,12 +85,95 @@ class FacebookIE(InfoExtractor):
     }, {
         'note': 'Video with DASH manifest',
         'url': 'https://www.facebook.com/video.php?v=957955867617029',
-        'md5': '54706e4db4f5ad58fbad82dde1f1213f',
+        'md5': 'b2c28d528273b323abe5c6ab59f0f030',
         'info_dict': {
             'id': '957955867617029',
             'ext': 'mp4',
             'title': 'When you post epic content on instagram.com/433 8 million followers, this is ...',
             'uploader': 'Demy de Zeeuw',
+            'upload_date': '20160110',
+            'timestamp': 1452431627,
+        },
+    }, {
+        'url': 'https://www.facebook.com/maxlayn/posts/10153807558977570',
+        'md5': '037b1fa7f3c2d02b7a0d7bc16031ecc6',
+        'info_dict': {
+            'id': '544765982287235',
+            'ext': 'mp4',
+            'title': '"What are you doing running in the snow?"',
+            'uploader': 'FailArmy',
+        },
+        'skip': 'Video gone',
+    }, {
+        'url': 'https://m.facebook.com/story.php?story_fbid=1035862816472149&id=116132035111903',
+        'md5': '1deb90b6ac27f7efcf6d747c8a27f5e3',
+        'info_dict': {
+            'id': '1035862816472149',
+            'ext': 'mp4',
+            'title': 'What the Flock Is Going On In New Zealand  Credit: ViralHog',
+            'uploader': 'S. Saint',
+        },
+        'skip': 'Video gone',
+    }, {
+        'note': 'swf params escaped',
+        'url': 'https://www.facebook.com/barackobama/posts/10153664894881749',
+        'md5': '97ba073838964d12c70566e0085c2b91',
+        'info_dict': {
+            'id': '10153664894881749',
+            'ext': 'mp4',
+            'title': 'Facebook video #10153664894881749',
+        },
+    }, {
+        # have 1080P, but only up to 720p in swf params
+        'url': 'https://www.facebook.com/cnn/videos/10155529876156509/',
+        'md5': '0d9813160b146b3bc8744e006027fcc6',
+        'info_dict': {
+            'id': '10155529876156509',
+            'ext': 'mp4',
+            'title': 'Holocaust survivor becomes US citizen',
+            'timestamp': 1477818095,
+            'upload_date': '20161030',
+            'uploader': 'CNN',
+        },
+    }, {
+        # bigPipe.onPageletArrive ... onPageletArrive pagelet_group_mall
+        'url': 'https://www.facebook.com/yaroslav.korpan/videos/1417995061575415/',
+        'info_dict': {
+            'id': '1417995061575415',
+            'ext': 'mp4',
+            'title': 'md5:a7b86ca673f51800cd54687b7f4012fe',
+            'timestamp': 1486648217,
+            'upload_date': '20170209',
+            'uploader': 'Yaroslav Korpan',
+        },
+        'params': {
+            'skip_download': True,
+        },
+    }, {
+        'url': 'https://www.facebook.com/LaGuiaDelVaron/posts/1072691702860471',
+        'info_dict': {
+            'id': '1072691702860471',
+            'ext': 'mp4',
+            'title': 'md5:ae2d22a93fbb12dad20dc393a869739d',
+            'timestamp': 1477305000,
+            'upload_date': '20161024',
+            'uploader': 'La Guía Del Varón',
+        },
+        'params': {
+            'skip_download': True,
+        },
+    }, {
+        'url': 'https://www.facebook.com/groups/1024490957622648/permalink/1396382447100162/',
+        'info_dict': {
+            'id': '1396382447100162',
+            'ext': 'mp4',
+            'title': 'md5:e2d2700afdf84e121f5d0f999bad13a3',
+            'timestamp': 1486035494,
+            'upload_date': '20170202',
+            'uploader': 'Elisabeth Ahtn',
+        },
+        'params': {
+            'skip_download': True,
         },
     }, {
         'url': 'https://www.facebook.com/video.php?v=10204634152394104',
@@ -94,9 +188,30 @@ class FacebookIE(InfoExtractor):
         'url': 'facebook:544765982287235',
         'only_matching': True,
     }, {
-        'url': 'https://m.facebook.com/story.php?story_fbid=1035862816472149&id=116132035111903',
+        'url': 'https://www.facebook.com/groups/164828000315060/permalink/764967300301124/',
+        'only_matching': True,
+    }, {
+        'url': 'https://zh-hk.facebook.com/peoplespower/videos/1135894589806027/',
+        'only_matching': True,
+    }, {
+        'url': 'https://www.facebookcorewwwi.onion/video.php?v=274175099429670',
         'only_matching': True,
     }]
+
+    @staticmethod
+    def _extract_url(webpage):
+        mobj = re.search(
+            r'<iframe[^>]+?src=(["\'])(?P<url>https://www\.facebook\.com/video/embed.+?)\1', webpage)
+        if mobj is not None:
+            return mobj.group('url')
+
+        # Facebook API embed
+        # see https://developers.facebook.com/docs/plugins/embedded-video-player
+        mobj = re.search(r'''(?x)<div[^>]+
+                class=(?P<q1>[\'"])[^\'"]*\bfb-(?:video|post)\b[^\'"]*(?P=q1)[^>]+
+                data-href=(?P<q2>[\'"])(?P<url>(?:https?:)?//(?:www\.)?facebook.com/.+?)(?P=q2)''', webpage)
+        if mobj is not None:
+            return mobj.group('url')
 
     def _login(self):
         (useremail, password) = self._get_login_info()
@@ -164,48 +279,56 @@ class FacebookIE(InfoExtractor):
     def _real_initialize(self):
         self._login()
 
-    def _real_extract(self, url):
-        video_id = self._match_id(url)
-        req = sanitized_Request('https://www.facebook.com/video/video.php?v=%s' % video_id)
+    def _extract_from_url(self, url, video_id, fatal_if_no_video=True):
+        req = sanitized_Request(url)
         req.add_header('User-Agent', self._CHROME_USER_AGENT)
         webpage = self._download_webpage(req, video_id)
 
         video_data = None
 
-        BEFORE = '{swf.addParam(param[0], param[1]);});\n'
-        AFTER = '.forEach(function(variable) {swf.addVariable(variable[0], variable[1]);});'
-        m = re.search(re.escape(BEFORE) + '(.*?)' + re.escape(AFTER), webpage)
-        if m:
-            data = dict(json.loads(m.group(1)))
-            params_raw = compat_urllib_parse_unquote(data['params'])
-            video_data = json.loads(params_raw)['video_data']
-
-        def video_data_list2dict(video_data):
-            ret = {}
-            for item in video_data:
-                format_id = item['stream_type']
-                ret.setdefault(format_id, []).append(item)
-            return ret
-
-        if not video_data:
-            server_js_data = self._parse_json(self._search_regex(
-                r'handleServerJS\(({.+})\);', webpage, 'server js data'), video_id)
-            for item in server_js_data.get('instances', []):
+        def extract_video_data(instances):
+            for item in instances:
                 if item[1][0] == 'VideoConfig':
-                    video_data = video_data_list2dict(item[2][0]['videoData'])
-                    break
+                    video_item = item[2][0]
+                    if video_item.get('video_id'):
+                        return video_item['videoData']
+
+        server_js_data = self._parse_json(self._search_regex(
+            r'handleServerJS\(({.+})(?:\);|,")', webpage,
+            'server js data', default='{}'), video_id, fatal=False)
+
+        if server_js_data:
+            video_data = extract_video_data(server_js_data.get('instances', []))
 
         if not video_data:
+            server_js_data = self._parse_json(
+                self._search_regex(
+                    r'bigPipe\.onPageletArrive\(({.+?})\)\s*;\s*}\s*\)\s*,\s*["\']onPageletArrive\s+(?:stream_pagelet|pagelet_group_mall)',
+                    webpage, 'js data', default='{}'),
+                video_id, transform_source=js_to_json, fatal=False)
+            if server_js_data:
+                video_data = extract_video_data(try_get(
+                    server_js_data, lambda x: x['jsmods']['instances'],
+                    list) or [])
+
+        if not video_data:
+            if not fatal_if_no_video:
+                return webpage, False
             m_msg = re.search(r'class="[^"]*uiInterstitialContent[^"]*"><div>(.*?)</div>', webpage)
             if m_msg is not None:
                 raise ExtractorError(
                     'The video is not available, Facebook said: "%s"' % m_msg.group(1),
                     expected=True)
+            elif '>You must log in to continue' in webpage:
+                self.raise_login_required()
             else:
                 raise ExtractorError('Cannot parse data')
 
         formats = []
-        for format_id, f in video_data.items():
+        for f in video_data:
+            format_id = f['stream_type']
+            if f and isinstance(f, dict):
+                f = [f]
             if not f or not isinstance(f, list):
                 continue
             for quality in ('sd', 'hd'):
@@ -236,44 +359,80 @@ class FacebookIE(InfoExtractor):
             video_title = self._html_search_regex(
                 r'(?s)<span class="fbPhotosPhotoCaption".*?id="fbPhotoPageCaption"><span class="hasCaption">(.*?)</span>',
                 webpage, 'alternative title', default=None)
-            video_title = limit_length(video_title, 80)
         if not video_title:
+            video_title = self._html_search_meta(
+                'description', webpage, 'title')
+        if video_title:
+            video_title = limit_length(video_title, 80)
+        else:
             video_title = 'Facebook video #%s' % video_id
-        uploader = clean_html(get_element_by_id('fbPhotoPageAuthorName', webpage))
+        uploader = clean_html(get_element_by_id(
+            'fbPhotoPageAuthorName', webpage)) or self._search_regex(
+            r'ownerName\s*:\s*"([^"]+)"', webpage, 'uploader', fatal=False)
+        timestamp = int_or_none(self._search_regex(
+            r'<abbr[^>]+data-utime=["\'](\d+)', webpage,
+            'timestamp', default=None))
 
-        return {
+        info_dict = {
             'id': video_id,
             'title': video_title,
             'formats': formats,
             'uploader': uploader,
+            'timestamp': timestamp,
         }
 
-
-class FacebookPostIE(InfoExtractor):
-    IE_NAME = 'facebook:post'
-    _VALID_URL = r'https?://(?:\w+\.)?facebook\.com/[^/]+/posts/(?P<id>\d+)'
-    _TEST = {
-        'url': 'https://www.facebook.com/maxlayn/posts/10153807558977570',
-        'md5': '037b1fa7f3c2d02b7a0d7bc16031ecc6',
-        'info_dict': {
-            'id': '544765982287235',
-            'ext': 'mp4',
-            'title': '"What are you doing running in the snow?"',
-            'uploader': 'FailArmy',
-        }
-    }
+        return webpage, info_dict
 
     def _real_extract(self, url):
-        post_id = self._match_id(url)
+        video_id = self._match_id(url)
 
-        webpage = self._download_webpage(url, post_id)
+        real_url = self._VIDEO_PAGE_TEMPLATE % video_id if url.startswith('facebook:') else url
+        webpage, info_dict = self._extract_from_url(real_url, video_id, fatal_if_no_video=False)
 
-        entries = [
-            self.url_result('facebook:%s' % video_id, FacebookIE.ie_key())
-            for video_id in self._parse_json(
-                self._search_regex(
-                    r'(["\'])video_ids\1\s*:\s*(?P<ids>\[.+?\])',
-                    webpage, 'video ids', group='ids'),
-                post_id)]
+        if info_dict:
+            return info_dict
 
-        return self.playlist_result(entries, post_id)
+        if '/posts/' in url:
+            entries = [
+                self.url_result('facebook:%s' % vid, FacebookIE.ie_key())
+                for vid in self._parse_json(
+                    self._search_regex(
+                        r'(["\'])video_ids\1\s*:\s*(?P<ids>\[.+?\])',
+                        webpage, 'video ids', group='ids'),
+                    video_id)]
+
+            return self.playlist_result(entries, video_id)
+        else:
+            _, info_dict = self._extract_from_url(
+                self._VIDEO_PAGE_TEMPLATE % video_id,
+                video_id, fatal_if_no_video=True)
+            return info_dict
+
+
+class FacebookPluginsVideoIE(InfoExtractor):
+    _VALID_URL = r'https?://(?:[\w-]+\.)?facebook\.com/plugins/video\.php\?.*?\bhref=(?P<id>https.+)'
+
+    _TESTS = [{
+        'url': 'https://www.facebook.com/plugins/video.php?href=https%3A%2F%2Fwww.facebook.com%2Fgov.sg%2Fvideos%2F10154383743583686%2F&show_text=0&width=560',
+        'md5': '5954e92cdfe51fe5782ae9bda7058a07',
+        'info_dict': {
+            'id': '10154383743583686',
+            'ext': 'mp4',
+            'title': 'What to do during the haze?',
+            'uploader': 'Gov.sg',
+            'upload_date': '20160826',
+            'timestamp': 1472184808,
+        },
+        'add_ie': [FacebookIE.ie_key()],
+    }, {
+        'url': 'https://www.facebook.com/plugins/video.php?href=https%3A%2F%2Fwww.facebook.com%2Fvideo.php%3Fv%3D10204634152394104',
+        'only_matching': True,
+    }, {
+        'url': 'https://www.facebook.com/plugins/video.php?href=https://www.facebook.com/gov.sg/videos/10154383743583686/&show_text=0&width=560',
+        'only_matching': True,
+    }]
+
+    def _real_extract(self, url):
+        return self.url_result(
+            compat_urllib_parse_unquote(self._match_id(url)),
+            FacebookIE.ie_key())

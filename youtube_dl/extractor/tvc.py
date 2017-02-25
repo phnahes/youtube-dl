@@ -11,7 +11,7 @@ from ..utils import (
 
 
 class TVCIE(InfoExtractor):
-    _VALID_URL = r'http://(?:www\.)?tvc\.ru/video/iframe/id/(?P<id>\d+)'
+    _VALID_URL = r'https?://(?:www\.)?tvc\.ru/video/iframe/id/(?P<id>\d+)'
     _TEST = {
         'url': 'http://www.tvc.ru/video/iframe/id/74622/isPlay/false/id_stat/channel/?acc_video_id=/channel/brand/id/17/show/episodes/episode_id/39702',
         'md5': 'bbc5ff531d1e90e856f60fc4b3afd708',
@@ -19,7 +19,7 @@ class TVCIE(InfoExtractor):
             'id': '74622',
             'ext': 'mp4',
             'title': 'События. "События". Эфир от 22.05.2015 14:30',
-            'thumbnail': 're:^https?://.*\.jpg$',
+            'thumbnail': r're:^https?://.*\.jpg$',
             'duration': 1122,
         },
     }
@@ -64,7 +64,7 @@ class TVCIE(InfoExtractor):
 
 
 class TVCArticleIE(InfoExtractor):
-    _VALID_URL = r'http://(?:www\.)?tvc\.ru/(?!video/iframe/id/)(?P<id>[^?#]+)'
+    _VALID_URL = r'https?://(?:www\.)?tvc\.ru/(?!video/iframe/id/)(?P<id>[^?#]+)'
     _TESTS = [{
         'url': 'http://www.tvc.ru/channel/brand/id/29/show/episodes/episode_id/39702/',
         'info_dict': {
@@ -72,7 +72,7 @@ class TVCArticleIE(InfoExtractor):
             'ext': 'mp4',
             'title': 'События. "События". Эфир от 22.05.2015 14:30',
             'description': 'md5:ad7aa7db22903f983e687b8a3e98c6dd',
-            'thumbnail': 're:^https?://.*\.jpg$',
+            'thumbnail': r're:^https?://.*\.jpg$',
             'duration': 1122,
         },
     }, {
@@ -82,7 +82,7 @@ class TVCArticleIE(InfoExtractor):
             'ext': 'mp4',
             'title': 'Эксперты: в столице встал вопрос о максимально безопасных остановках',
             'description': 'md5:f2098f71e21f309e89f69b525fd9846e',
-            'thumbnail': 're:^https?://.*\.jpg$',
+            'thumbnail': r're:^https?://.*\.jpg$',
             'duration': 278,
         },
     }, {
@@ -92,7 +92,7 @@ class TVCArticleIE(InfoExtractor):
             'ext': 'mp4',
             'title': 'Ещё не поздно. Эфир от 03.08.2013',
             'description': 'md5:51fae9f3f8cfe67abce014e428e5b027',
-            'thumbnail': 're:^https?://.*\.jpg$',
+            'thumbnail': r're:^https?://.*\.jpg$',
             'duration': 3316,
         },
     }]

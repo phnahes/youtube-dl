@@ -12,7 +12,7 @@ from ..utils import (
 
 
 class KarriereVideosIE(InfoExtractor):
-    _VALID_URL = r'http://(?:www\.)?karrierevideos\.at(?:/[^/]+)+/(?P<id>[^/]+)'
+    _VALID_URL = r'https?://(?:www\.)?karrierevideos\.at(?:/[^/]+)+/(?P<id>[^/]+)'
     _TESTS = [{
         'url': 'http://www.karrierevideos.at/berufsvideos/mittlere-hoehere-schulen/altenpflegerin',
         'info_dict': {
@@ -20,7 +20,7 @@ class KarriereVideosIE(InfoExtractor):
             'ext': 'flv',
             'title': 'AltenpflegerIn',
             'description': 'md5:dbadd1259fde2159a9b28667cb664ae2',
-            'thumbnail': 're:^http://.*\.png',
+            'thumbnail': r're:^http://.*\.png',
         },
         'params': {
             # rtmp download
@@ -34,7 +34,7 @@ class KarriereVideosIE(InfoExtractor):
             'ext': 'flv',
             'title': 'Väterkarenz und neue Chancen für Mütter - "Baby - was nun?"',
             'description': 'md5:97092c6ad1fd7d38e9d6a5fdeb2bcc33',
-            'thumbnail': 're:^http://.*\.png',
+            'thumbnail': r're:^http://.*\.png',
         },
         'params': {
             # rtmp download
@@ -52,9 +52,12 @@ class KarriereVideosIE(InfoExtractor):
 
         video_id = self._search_regex(
             r'/config/video/(.+?)\.xml', webpage, 'video id')
+        # Server returns malformed headers
+        # Force Accept-Encoding: * to prevent gzipped results
         playlist = self._download_xml(
             'http://www.karrierevideos.at/player-playlist.xml.php?p=%s' % video_id,
-            video_id, transform_source=fix_xml_ampersands)
+            video_id, transform_source=fix_xml_ampersands,
+            headers={'Accept-Encoding': '*'})
 
         NS_MAP = {
             'jwplayer': 'http://developer.longtailvideo.com/trac/wiki/FlashFormats'

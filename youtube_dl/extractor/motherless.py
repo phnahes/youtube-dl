@@ -12,7 +12,7 @@ from ..utils import (
 
 
 class MotherlessIE(InfoExtractor):
-    _VALID_URL = r'http://(?:www\.)?motherless\.com/(?:g/[a-z0-9_]+/)?(?P<id>[A-Z0-9]+)'
+    _VALID_URL = r'https?://(?:www\.)?motherless\.com/(?:g/[a-z0-9_]+/)?(?P<id>[A-Z0-9]+)'
     _TESTS = [{
         'url': 'http://motherless.com/AC3FFE1',
         'md5': '310f62e325a9fafe64f68c0bccb6e75f',
@@ -23,7 +23,7 @@ class MotherlessIE(InfoExtractor):
             'categories': ['Gaming', 'anal', 'reluctant', 'rough', 'Wife'],
             'upload_date': '20100913',
             'uploader_id': 'famouslyfuckedup',
-            'thumbnail': 're:http://.*\.jpg',
+            'thumbnail': r're:http://.*\.jpg',
             'age_limit': 18,
         }
     }, {
@@ -37,7 +37,7 @@ class MotherlessIE(InfoExtractor):
                            'game', 'hairy'],
             'upload_date': '20140622',
             'uploader_id': 'Sulivana7x',
-            'thumbnail': 're:http://.*\.jpg',
+            'thumbnail': r're:http://.*\.jpg',
             'age_limit': 18,
         },
         'skip': '404',
@@ -51,7 +51,7 @@ class MotherlessIE(InfoExtractor):
             'categories': ['superheroine heroine  superher'],
             'upload_date': '20140827',
             'uploader_id': 'shade0230',
-            'thumbnail': 're:http://.*\.jpg',
+            'thumbnail': r're:http://.*\.jpg',
             'age_limit': 18,
         }
     }, {
@@ -68,6 +68,9 @@ class MotherlessIE(InfoExtractor):
                 '<title>404 - MOTHERLESS.COM<',
                 ">The page you're looking for cannot be found.<")):
             raise ExtractorError('Video %s does not exist' % video_id, expected=True)
+
+        if '>The content you are trying to view is for friends only.' in webpage:
+            raise ExtractorError('Video %s is for friends only' % video_id, expected=True)
 
         title = self._html_search_regex(
             r'id="view-upload-title">\s+([^<]+)<', webpage, 'title')

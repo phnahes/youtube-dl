@@ -1,12 +1,12 @@
-# -*- coding: utf-8 -*-
+# coding: utf-8
 from __future__ import unicode_literals
 
 from .common import InfoExtractor
-from ..compat import compat_urllib_parse
 from ..utils import (
     ExtractorError,
     NO_DEFAULT,
     sanitized_Request,
+    urlencode_postdata,
 )
 
 
@@ -20,7 +20,7 @@ class VodlockerIE(InfoExtractor):
             'id': 'e8wvyzz4sl42',
             'ext': 'mp4',
             'title': 'Germany vs Brazil',
-            'thumbnail': 're:http://.*\.jpg',
+            'thumbnail': r're:http://.*\.jpg',
         },
     }]
 
@@ -31,14 +31,15 @@ class VodlockerIE(InfoExtractor):
         if any(p in webpage for p in (
                 '>THIS FILE WAS DELETED<',
                 '>File Not Found<',
-                'The file you were looking for could not be found, sorry for any inconvenience.<')):
+                'The file you were looking for could not be found, sorry for any inconvenience.<',
+                '>The file was removed')):
             raise ExtractorError('Video %s does not exist' % video_id, expected=True)
 
         fields = self._hidden_inputs(webpage)
 
         if fields['op'] == 'download1':
             self._sleep(3, video_id)  # they do detect when requests happen too fast!
-            post = compat_urllib_parse.urlencode(fields)
+            post = urlencode_postdata(fields)
             req = sanitized_Request(url, post)
             req.add_header('Content-type', 'application/x-www-form-urlencoded')
             webpage = self._download_webpage(

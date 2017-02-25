@@ -1,4 +1,4 @@
-# encoding: utf-8
+# coding: utf-8
 from __future__ import unicode_literals
 
 import re
@@ -88,7 +88,7 @@ class RutubeIE(InfoExtractor):
 class RutubeEmbedIE(InfoExtractor):
     IE_NAME = 'rutube:embed'
     IE_DESC = 'Rutube embedded videos'
-    _VALID_URL = 'https?://rutube\.ru/(?:video|play)/embed/(?P<id>[0-9]+)'
+    _VALID_URL = r'https?://rutube\.ru/(?:video|play)/embed/(?P<id>[0-9]+)'
 
     _TESTS = [{
         'url': 'http://rutube.ru/video/embed/6722881?vk_puid37=&vk_puid38=',
@@ -122,7 +122,7 @@ class RutubeEmbedIE(InfoExtractor):
 class RutubeChannelIE(InfoExtractor):
     IE_NAME = 'rutube:channel'
     IE_DESC = 'Rutube channels'
-    _VALID_URL = r'http://rutube\.ru/tags/video/(?P<id>\d+)'
+    _VALID_URL = r'https?://rutube\.ru/tags/video/(?P<id>\d+)'
     _TESTS = [{
         'url': 'http://rutube.ru/tags/video/1800/',
         'info_dict': {
@@ -156,7 +156,7 @@ class RutubeChannelIE(InfoExtractor):
 class RutubeMovieIE(RutubeChannelIE):
     IE_NAME = 'rutube:movie'
     IE_DESC = 'Rutube movies'
-    _VALID_URL = r'http://rutube\.ru/metainfo/tv/(?P<id>\d+)'
+    _VALID_URL = r'https?://rutube\.ru/metainfo/tv/(?P<id>\d+)'
     _TESTS = []
 
     _MOVIE_TEMPLATE = 'http://rutube.ru/api/metainfo/tv/%s/?format=json'
@@ -174,7 +174,7 @@ class RutubeMovieIE(RutubeChannelIE):
 class RutubePersonIE(RutubeChannelIE):
     IE_NAME = 'rutube:person'
     IE_DESC = 'Rutube person videos'
-    _VALID_URL = r'http://rutube\.ru/video/person/(?P<id>\d+)'
+    _VALID_URL = r'https?://rutube\.ru/video/person/(?P<id>\d+)'
     _TESTS = [{
         'url': 'http://rutube.ru/video/person/313878/',
         'info_dict': {

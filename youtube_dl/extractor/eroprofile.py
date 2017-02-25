@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 import re
 
 from .common import InfoExtractor
-from ..compat import compat_urllib_parse
+from ..compat import compat_urllib_parse_urlencode
 from ..utils import (
     ExtractorError,
     unescapeHTML
@@ -22,7 +22,7 @@ class EroProfileIE(InfoExtractor):
             'display_id': 'sexy-babe-softcore',
             'ext': 'm4v',
             'title': 'sexy babe softcore',
-            'thumbnail': 're:https?://.*\.jpg',
+            'thumbnail': r're:https?://.*\.jpg',
             'age_limit': 18,
         }
     }, {
@@ -32,7 +32,7 @@ class EroProfileIE(InfoExtractor):
             'id': '1133519',
             'ext': 'm4v',
             'title': 'Try It On Pee_cut_2.wmv - 4shared.com - file sharing - download movie file',
-            'thumbnail': 're:https?://.*\.jpg',
+            'thumbnail': r're:https?://.*\.jpg',
             'age_limit': 18,
         },
         'skip': 'Requires login',
@@ -43,7 +43,7 @@ class EroProfileIE(InfoExtractor):
         if username is None:
             return
 
-        query = compat_urllib_parse.urlencode({
+        query = compat_urllib_parse_urlencode({
             'username': username,
             'password': password,
             'url': 'http://www.eroprofile.com/',

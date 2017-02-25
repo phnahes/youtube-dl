@@ -20,6 +20,7 @@ from youtube_dl.utils import (
     args_to_str,
     encode_base_n,
     clean_html,
+    date_from_str,
     DateRange,
     detect_exe_version,
     determine_ext,
@@ -28,39 +29,54 @@ from youtube_dl.utils import (
     encodeFilename,
     escape_rfc3986,
     escape_url,
+    extract_attributes,
     ExtractorError,
     find_xpath_attr,
     fix_xml_ampersands,
+    get_element_by_class,
+    get_element_by_attribute,
+    get_elements_by_class,
+    get_elements_by_attribute,
     InAdvancePagedList,
     intlist_to_bytes,
     is_html,
     js_to_json,
     limit_length,
+    mimetype2ext,
+    month_by_name,
     ohdave_rsa_encrypt,
     OnDemandPagedList,
     orderedSet,
+    parse_age_limit,
     parse_duration,
     parse_filesize,
+    parse_count,
     parse_iso8601,
     read_batch_urls,
     sanitize_filename,
     sanitize_path,
     prepend_extension,
     replace_extension,
+    remove_start,
+    remove_end,
     remove_quotes,
     shell_quote,
     smuggle_url,
     str_to_int,
     strip_jsonp,
-    struct_unpack,
     timeconvert,
     unescapeHTML,
     unified_strdate,
+    unified_timestamp,
     unsmuggle_url,
     uppercase_escape,
     lowercase_escape,
     url_basename,
+    base_url,
+    urljoin,
     urlencode_postdata,
+    urshift,
+    update_url_query,
     version_tuple,
     xpath_with_ns,
     xpath_element,
@@ -73,9 +89,13 @@ from youtube_dl.utils import (
     cli_option,
     cli_valueless_option,
     cli_bool_option,
+    parse_codecs,
 )
 from youtube_dl.compat import (
+    compat_chr,
     compat_etree_fromstring,
+    compat_urlparse,
+    compat_parse_qs,
 )
 
 
@@ -132,8 +152,8 @@ class TestUtil(unittest.TestCase):
         self.assertEqual('yes_no', sanitize_filename('yes? no', restricted=True))
         self.assertEqual('this_-_that', sanitize_filename('this: that', restricted=True))
 
-        tests = 'a\xe4b\u4e2d\u56fd\u7684c'
-        self.assertEqual(sanitize_filename(tests, restricted=True), 'a_b_c')
+        tests = 'aäb\u4e2d\u56fd\u7684c'
+        self.assertEqual(sanitize_filename(tests, restricted=True), 'aab_c')
         self.assertTrue(sanitize_filename('\xf6', restricted=True) != '')  # No empty filename
 
         forbidden = '"\0\\/&!: \'\t\n()[]{}$;`^,#'
@@ -147,6 +167,10 @@ class TestUtil(unittest.TestCase):
         # .. but make sure the file name is never empty
         self.assertTrue(sanitize_filename('-', restricted=True) != '')
         self.assertTrue(sanitize_filename(':', restricted=True) != '')
+
+        self.assertEqual(sanitize_filename(
+            'ÂÃÄÀÁÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖŐØŒÙÚÛÜŰÝÞßàáâãäåæçèéêëìíîïðñòóôõöőøœùúûüűýþÿ', restricted=True),
+            'AAAAAAAECEEEEIIIIDNOOOOOOOOEUUUUUYPssaaaaaaaeceeeeiiiionooooooooeuuuuuypy')
 
     def test_sanitize_ids(self):
         self.assertEqual(sanitize_filename('_n_cd26wFpw', is_id=True), '_n_cd26wFpw')
@@ -205,6 +229,16 @@ class TestUtil(unittest.TestCase):
         self.assertEqual(replace_extension('.abc', 'temp'), '.abc.temp')
         self.assertEqual(replace_extension('.abc.ext', 'temp'), '.abc.temp')
 
+    def test_remove_start(self):
+        self.assertEqual(remove_start(None, 'A - '), None)
+        self.assertEqual(remove_start('A - B', 'A - '), 'B')
+        self.assertEqual(remove_start('B - A', 'A - '), 'B - A')
+
+    def test_remove_end(self):
+        self.assertEqual(remove_end(None, ' - B'), None)
+        self.assertEqual(remove_end('A - B', ' - B'), 'A')
+        self.assertEqual(remove_end('B - A', ' - B'), 'B - A')
+
     def test_remove_quotes(self):
         self.assertEqual(remove_quotes(None), None)
         self.assertEqual(remove_quotes('"'), '"')
@@ -227,6 +261,15 @@ class TestUtil(unittest.TestCase):
         self.assertEqual(unescapeHTML('&#47;'), '/')
         self.assertEqual(unescapeHTML('&eacute;'), 'é')
         self.assertEqual(unescapeHTML('&#2013266066;'), '&#2013266066;')
+        # HTML5 entities
+        self.assertEqual(unescapeHTML('&period;&apos;'), '.\'')
+
+    def test_date_from_str(self):
+        self.assertEqual(date_from_str('yesterday'), date_from_str('now-1day'))
+        self.assertEqual(date_from_str('now+7day'), date_from_str('now+1week'))
+        self.assertEqual(date_from_str('now+14day'), date_from_str('now+2week'))
+        self.assertEqual(date_from_str('now+365day'), date_from_str('now+1year'))
+        self.assertEqual(date_from_str('now+30day'), date_from_str('now+1month'))
 
     def test_daterange(self):
         _20century = DateRange("19000101", "20000101")
@@ -252,7 +295,33 @@ class TestUtil(unittest.TestCase):
             '20150202')
         self.assertEqual(unified_strdate('Feb 14th 2016 5:45PM'), '20160214')
         self.assertEqual(unified_strdate('25-09-2014'), '20140925')
+        self.assertEqual(unified_strdate('27.02.2016 17:30'), '20160227')
         self.assertEqual(unified_strdate('UNKNOWN DATE FORMAT'), None)
+        self.assertEqual(unified_strdate('Feb 7, 2016 at 6:35 pm'), '20160207')
+        self.assertEqual(unified_strdate('July 15th, 2013'), '20130715')
+        self.assertEqual(unified_strdate('September 1st, 2013'), '20130901')
+        self.assertEqual(unified_strdate('Sep 2nd, 2013'), '20130902')
+
+    def test_unified_timestamps(self):
+        self.assertEqual(unified_timestamp('December 21, 2010'), 1292889600)
+        self.assertEqual(unified_timestamp('8/7/2009'), 1247011200)
+        self.assertEqual(unified_timestamp('Dec 14, 2012'), 1355443200)
+        self.assertEqual(unified_timestamp('2012/10/11 01:56:38 +0000'), 1349920598)
+        self.assertEqual(unified_timestamp('1968 12 10'), -33436800)
+        self.assertEqual(unified_timestamp('1968-12-10'), -33436800)
+        self.assertEqual(unified_timestamp('28/01/2014 21:00:00 +0100'), 1390939200)
+        self.assertEqual(
+            unified_timestamp('11/26/2014 11:30:00 AM PST', day_first=False),
+            1417001400)
+        self.assertEqual(
+            unified_timestamp('2/2/2015 6:47:40 PM', day_first=False),
+            1422902860)
+        self.assertEqual(unified_timestamp('Feb 14th 2016 5:45PM'), 1455471900)
+        self.assertEqual(unified_timestamp('25-09-2014'), 1411603200)
+        self.assertEqual(unified_timestamp('27.02.2016 17:30'), 1456594200)
+        self.assertEqual(unified_timestamp('UNKNOWN DATE FORMAT'), None)
+        self.assertEqual(unified_timestamp('May 16, 2016 11:15 PM'), 1463440500)
+        self.assertEqual(unified_timestamp('Feb 7, 2016 at 6:35 pm'), 1454870100)
 
     def test_determine_ext(self):
         self.assertEqual(determine_ext('http://example.com/foo/bar.mp4/?download'), 'mp4')
@@ -352,6 +421,12 @@ class TestUtil(unittest.TestCase):
         self.assertEqual(res_url, url)
         self.assertEqual(res_data, None)
 
+        smug_url = smuggle_url(url, {'a': 'b'})
+        smug_smug_url = smuggle_url(smug_url, {'c': 'd'})
+        res_url, res_data = unsmuggle_url(smug_smug_url)
+        self.assertEqual(res_url, url)
+        self.assertEqual(res_data, {'a': 'b', 'c': 'd'})
+
     def test_shell_quote(self):
         args = ['ffmpeg', '-i', encodeFilename('ñ€ß\'.mp4')]
         self.assertEqual(shell_quote(args), """ffmpeg -i 'ñ€ß'"'"'.mp4'""")
@@ -369,6 +444,44 @@ class TestUtil(unittest.TestCase):
         self.assertEqual(
             url_basename('http://media.w3.org/2010/05/sintel/trailer.mp4'),
             'trailer.mp4')
+
+    def test_base_url(self):
+        self.assertEqual(base_url('http://foo.de/'), 'http://foo.de/')
+        self.assertEqual(base_url('http://foo.de/bar'), 'http://foo.de/')
+        self.assertEqual(base_url('http://foo.de/bar/'), 'http://foo.de/bar/')
+        self.assertEqual(base_url('http://foo.de/bar/baz'), 'http://foo.de/bar/')
+        self.assertEqual(base_url('http://foo.de/bar/baz?x=z/x/c'), 'http://foo.de/bar/')
+
+    def test_urljoin(self):
+        self.assertEqual(urljoin('http://foo.de/', '/a/b/c.txt'), 'http://foo.de/a/b/c.txt')
+        self.assertEqual(urljoin('//foo.de/', '/a/b/c.txt'), '//foo.de/a/b/c.txt')
+        self.assertEqual(urljoin('http://foo.de/', 'a/b/c.txt'), 'http://foo.de/a/b/c.txt')
+        self.assertEqual(urljoin('http://foo.de', '/a/b/c.txt'), 'http://foo.de/a/b/c.txt')
+        self.assertEqual(urljoin('http://foo.de', 'a/b/c.txt'), 'http://foo.de/a/b/c.txt')
+        self.assertEqual(urljoin('http://foo.de/', 'http://foo.de/a/b/c.txt'), 'http://foo.de/a/b/c.txt')
+        self.assertEqual(urljoin('http://foo.de/', '//foo.de/a/b/c.txt'), '//foo.de/a/b/c.txt')
+        self.assertEqual(urljoin(None, 'http://foo.de/a/b/c.txt'), 'http://foo.de/a/b/c.txt')
+        self.assertEqual(urljoin(None, '//foo.de/a/b/c.txt'), '//foo.de/a/b/c.txt')
+        self.assertEqual(urljoin('', 'http://foo.de/a/b/c.txt'), 'http://foo.de/a/b/c.txt')
+        self.assertEqual(urljoin(['foobar'], 'http://foo.de/a/b/c.txt'), 'http://foo.de/a/b/c.txt')
+        self.assertEqual(urljoin('http://foo.de/', None), None)
+        self.assertEqual(urljoin('http://foo.de/', ''), None)
+        self.assertEqual(urljoin('http://foo.de/', ['foobar']), None)
+        self.assertEqual(urljoin('http://foo.de/a/b/c.txt', '.././../d.txt'), 'http://foo.de/d.txt')
+
+    def test_parse_age_limit(self):
+        self.assertEqual(parse_age_limit(None), None)
+        self.assertEqual(parse_age_limit(False), None)
+        self.assertEqual(parse_age_limit('invalid'), None)
+        self.assertEqual(parse_age_limit(0), 0)
+        self.assertEqual(parse_age_limit(18), 18)
+        self.assertEqual(parse_age_limit(21), 21)
+        self.assertEqual(parse_age_limit(22), None)
+        self.assertEqual(parse_age_limit('18'), 18)
+        self.assertEqual(parse_age_limit('18+'), 18)
+        self.assertEqual(parse_age_limit('PG-13'), 13)
+        self.assertEqual(parse_age_limit('TV-14'), 14)
+        self.assertEqual(parse_age_limit('TV-MA'), 17)
 
     def test_parse_duration(self):
         self.assertEqual(parse_duration(None), None)
@@ -399,6 +512,8 @@ class TestUtil(unittest.TestCase):
         self.assertEqual(parse_duration('01:02:03:04'), 93784)
         self.assertEqual(parse_duration('1 hour 3 minutes'), 3780)
         self.assertEqual(parse_duration('87 Min.'), 5220)
+        self.assertEqual(parse_duration('PT1H0.040S'), 3600.04)
+        self.assertEqual(parse_duration('PT00H03M30SZ'), 210)
 
     def test_fix_xml_ampersands(self):
         self.assertEqual(
@@ -438,9 +553,6 @@ class TestUtil(unittest.TestCase):
         testPL(5, 2, (2, 99), [2, 3, 4])
         testPL(5, 2, (20, 99), [])
 
-    def test_struct_unpack(self):
-        self.assertEqual(struct_unpack('!B', b'\x00'), (0,))
-
     def test_read_batch_urls(self):
         f = io.StringIO('''\xef\xbb\xbf foo
             bar\r
@@ -453,6 +565,40 @@ class TestUtil(unittest.TestCase):
     def test_urlencode_postdata(self):
         data = urlencode_postdata({'username': 'foo@bar.com', 'password': '1234'})
         self.assertTrue(isinstance(data, bytes))
+
+    def test_update_url_query(self):
+        def query_dict(url):
+            return compat_parse_qs(compat_urlparse.urlparse(url).query)
+        self.assertEqual(query_dict(update_url_query(
+            'http://example.com/path', {'quality': ['HD'], 'format': ['mp4']})),
+            query_dict('http://example.com/path?quality=HD&format=mp4'))
+        self.assertEqual(query_dict(update_url_query(
+            'http://example.com/path', {'system': ['LINUX', 'WINDOWS']})),
+            query_dict('http://example.com/path?system=LINUX&system=WINDOWS'))
+        self.assertEqual(query_dict(update_url_query(
+            'http://example.com/path', {'fields': 'id,formats,subtitles'})),
+            query_dict('http://example.com/path?fields=id,formats,subtitles'))
+        self.assertEqual(query_dict(update_url_query(
+            'http://example.com/path', {'fields': ('id,formats,subtitles', 'thumbnails')})),
+            query_dict('http://example.com/path?fields=id,formats,subtitles&fields=thumbnails'))
+        self.assertEqual(query_dict(update_url_query(
+            'http://example.com/path?manifest=f4m', {'manifest': []})),
+            query_dict('http://example.com/path'))
+        self.assertEqual(query_dict(update_url_query(
+            'http://example.com/path?system=LINUX&system=WINDOWS', {'system': 'LINUX'})),
+            query_dict('http://example.com/path?system=LINUX'))
+        self.assertEqual(query_dict(update_url_query(
+            'http://example.com/path', {'fields': b'id,formats,subtitles'})),
+            query_dict('http://example.com/path?fields=id,formats,subtitles'))
+        self.assertEqual(query_dict(update_url_query(
+            'http://example.com/path', {'width': 1080, 'height': 720})),
+            query_dict('http://example.com/path?width=1080&height=720'))
+        self.assertEqual(query_dict(update_url_query(
+            'http://example.com/path', {'bitrate': 5020.43})),
+            query_dict('http://example.com/path?bitrate=5020.43'))
+        self.assertEqual(query_dict(update_url_query(
+            'http://example.com/path', {'test': '第二行тест'})),
+            query_dict('http://example.com/path?test=%E7%AC%AC%E4%BA%8C%E8%A1%8C%D1%82%D0%B5%D1%81%D1%82'))
 
     def test_dict_get(self):
         FALSE_VALUES = {
@@ -516,6 +662,45 @@ class TestUtil(unittest.TestCase):
             limit_length('foo bar baz asd', 12).startswith('foo bar'))
         self.assertTrue('...' in limit_length('foo bar baz asd', 12))
 
+    def test_mimetype2ext(self):
+        self.assertEqual(mimetype2ext(None), None)
+        self.assertEqual(mimetype2ext('video/x-flv'), 'flv')
+        self.assertEqual(mimetype2ext('application/x-mpegURL'), 'm3u8')
+        self.assertEqual(mimetype2ext('text/vtt'), 'vtt')
+        self.assertEqual(mimetype2ext('text/vtt;charset=utf-8'), 'vtt')
+        self.assertEqual(mimetype2ext('text/html; charset=utf-8'), 'html')
+
+    def test_month_by_name(self):
+        self.assertEqual(month_by_name(None), None)
+        self.assertEqual(month_by_name('December', 'en'), 12)
+        self.assertEqual(month_by_name('décembre', 'fr'), 12)
+        self.assertEqual(month_by_name('December'), 12)
+        self.assertEqual(month_by_name('décembre'), None)
+        self.assertEqual(month_by_name('Unknown', 'unknown'), None)
+
+    def test_parse_codecs(self):
+        self.assertEqual(parse_codecs(''), {})
+        self.assertEqual(parse_codecs('avc1.77.30, mp4a.40.2'), {
+            'vcodec': 'avc1.77.30',
+            'acodec': 'mp4a.40.2',
+        })
+        self.assertEqual(parse_codecs('mp4a.40.2'), {
+            'vcodec': 'none',
+            'acodec': 'mp4a.40.2',
+        })
+        self.assertEqual(parse_codecs('mp4a.40.5,avc1.42001e'), {
+            'vcodec': 'avc1.42001e',
+            'acodec': 'mp4a.40.5',
+        })
+        self.assertEqual(parse_codecs('avc3.640028'), {
+            'vcodec': 'avc3.640028',
+            'acodec': 'none',
+        })
+        self.assertEqual(parse_codecs(', h264,,newcodec,aac'), {
+            'vcodec': 'h264',
+            'acodec': 'aac',
+        })
+
     def test_escape_rfc3986(self):
         reserved = "!*'();:@&=+$,/?#[]"
         unreserved = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~'
@@ -537,11 +722,11 @@ class TestUtil(unittest.TestCase):
         )
         self.assertEqual(
             escape_url('http://тест.рф/фрагмент'),
-            'http://тест.рф/%D1%84%D1%80%D0%B0%D0%B3%D0%BC%D0%B5%D0%BD%D1%82'
+            'http://xn--e1aybc.xn--p1ai/%D1%84%D1%80%D0%B0%D0%B3%D0%BC%D0%B5%D0%BD%D1%82'
         )
         self.assertEqual(
             escape_url('http://тест.рф/абв?абв=абв#абв'),
-            'http://тест.рф/%D0%B0%D0%B1%D0%B2?%D0%B0%D0%B1%D0%B2=%D0%B0%D0%B1%D0%B2#%D0%B0%D0%B1%D0%B2'
+            'http://xn--e1aybc.xn--p1ai/%D0%B0%D0%B1%D0%B2?%D0%B0%D0%B1%D0%B2=%D0%B0%D0%B1%D0%B2#%D0%B0%D0%B1%D0%B2'
         )
         self.assertEqual(escape_url('http://vimeo.com/56015672#at=0'), 'http://vimeo.com/56015672#at=0')
 
@@ -568,6 +753,21 @@ class TestUtil(unittest.TestCase):
         json_code = js_to_json(inp)
         self.assertEqual(json.loads(json_code), json.loads(inp))
 
+        inp = '''{
+            0:{src:'skipped', type: 'application/dash+xml'},
+            1:{src:'skipped', type: 'application/vnd.apple.mpegURL'},
+        }'''
+        self.assertEqual(js_to_json(inp), '''{
+            "0":{"src":"skipped", "type": "application/dash+xml"},
+            "1":{"src":"skipped", "type": "application/vnd.apple.mpegURL"}
+        }''')
+
+        inp = '''{"foo":101}'''
+        self.assertEqual(js_to_json(inp), '''{"foo":101}''')
+
+        inp = '''{"duration": "00:01:07"}'''
+        self.assertEqual(js_to_json(inp), '''{"duration": "00:01:07"}''')
+
     def test_js_to_json_edgecases(self):
         on = js_to_json("{abc_def:'1\\'\\\\2\\\\\\'3\"4'}")
         self.assertEqual(json.loads(on), {"abc_def": "1'\\2\\'3\"4"})
@@ -588,8 +788,94 @@ class TestUtil(unittest.TestCase):
         on = js_to_json('["abc", "def",]')
         self.assertEqual(json.loads(on), ['abc', 'def'])
 
+        on = js_to_json('[/*comment\n*/"abc"/*comment\n*/,/*comment\n*/"def",/*comment\n*/]')
+        self.assertEqual(json.loads(on), ['abc', 'def'])
+
+        on = js_to_json('[//comment\n"abc" //comment\n,//comment\n"def",//comment\n]')
+        self.assertEqual(json.loads(on), ['abc', 'def'])
+
         on = js_to_json('{"abc": "def",}')
         self.assertEqual(json.loads(on), {'abc': 'def'})
+
+        on = js_to_json('{/*comment\n*/"abc"/*comment\n*/:/*comment\n*/"def"/*comment\n*/,/*comment\n*/}')
+        self.assertEqual(json.loads(on), {'abc': 'def'})
+
+        on = js_to_json('{ 0: /* " \n */ ",]" , }')
+        self.assertEqual(json.loads(on), {'0': ',]'})
+
+        on = js_to_json('{ /*comment\n*/0/*comment\n*/: /* " \n */ ",]" , }')
+        self.assertEqual(json.loads(on), {'0': ',]'})
+
+        on = js_to_json('{ 0: // comment\n1 }')
+        self.assertEqual(json.loads(on), {'0': 1})
+
+        on = js_to_json(r'["<p>x<\/p>"]')
+        self.assertEqual(json.loads(on), ['<p>x</p>'])
+
+        on = js_to_json(r'["\xaa"]')
+        self.assertEqual(json.loads(on), ['\u00aa'])
+
+        on = js_to_json("['a\\\nb']")
+        self.assertEqual(json.loads(on), ['ab'])
+
+        on = js_to_json("/*comment\n*/[/*comment\n*/'a\\\nb'/*comment\n*/]/*comment\n*/")
+        self.assertEqual(json.loads(on), ['ab'])
+
+        on = js_to_json('{0xff:0xff}')
+        self.assertEqual(json.loads(on), {'255': 255})
+
+        on = js_to_json('{/*comment\n*/0xff/*comment\n*/:/*comment\n*/0xff/*comment\n*/}')
+        self.assertEqual(json.loads(on), {'255': 255})
+
+        on = js_to_json('{077:077}')
+        self.assertEqual(json.loads(on), {'63': 63})
+
+        on = js_to_json('{/*comment\n*/077/*comment\n*/:/*comment\n*/077/*comment\n*/}')
+        self.assertEqual(json.loads(on), {'63': 63})
+
+        on = js_to_json('{42:42}')
+        self.assertEqual(json.loads(on), {'42': 42})
+
+        on = js_to_json('{/*comment\n*/42/*comment\n*/:/*comment\n*/42/*comment\n*/}')
+        self.assertEqual(json.loads(on), {'42': 42})
+
+    def test_extract_attributes(self):
+        self.assertEqual(extract_attributes('<e x="y">'), {'x': 'y'})
+        self.assertEqual(extract_attributes("<e x='y'>"), {'x': 'y'})
+        self.assertEqual(extract_attributes('<e x=y>'), {'x': 'y'})
+        self.assertEqual(extract_attributes('<e x="a \'b\' c">'), {'x': "a 'b' c"})
+        self.assertEqual(extract_attributes('<e x=\'a "b" c\'>'), {'x': 'a "b" c'})
+        self.assertEqual(extract_attributes('<e x="&#121;">'), {'x': 'y'})
+        self.assertEqual(extract_attributes('<e x="&#x79;">'), {'x': 'y'})
+        self.assertEqual(extract_attributes('<e x="&amp;">'), {'x': '&'})  # XML
+        self.assertEqual(extract_attributes('<e x="&quot;">'), {'x': '"'})
+        self.assertEqual(extract_attributes('<e x="&pound;">'), {'x': '£'})  # HTML 3.2
+        self.assertEqual(extract_attributes('<e x="&lambda;">'), {'x': 'λ'})  # HTML 4.0
+        self.assertEqual(extract_attributes('<e x="&foo">'), {'x': '&foo'})
+        self.assertEqual(extract_attributes('<e x="\'">'), {'x': "'"})
+        self.assertEqual(extract_attributes('<e x=\'"\'>'), {'x': '"'})
+        self.assertEqual(extract_attributes('<e x >'), {'x': None})
+        self.assertEqual(extract_attributes('<e x=y a>'), {'x': 'y', 'a': None})
+        self.assertEqual(extract_attributes('<e x= y>'), {'x': 'y'})
+        self.assertEqual(extract_attributes('<e x=1 y=2 x=3>'), {'y': '2', 'x': '3'})
+        self.assertEqual(extract_attributes('<e \nx=\ny\n>'), {'x': 'y'})
+        self.assertEqual(extract_attributes('<e \nx=\n"y"\n>'), {'x': 'y'})
+        self.assertEqual(extract_attributes("<e \nx=\n'y'\n>"), {'x': 'y'})
+        self.assertEqual(extract_attributes('<e \nx="\ny\n">'), {'x': '\ny\n'})
+        self.assertEqual(extract_attributes('<e CAPS=x>'), {'caps': 'x'})  # Names lowercased
+        self.assertEqual(extract_attributes('<e x=1 X=2>'), {'x': '2'})
+        self.assertEqual(extract_attributes('<e X=1 x=2>'), {'x': '2'})
+        self.assertEqual(extract_attributes('<e _:funny-name1=1>'), {'_:funny-name1': '1'})
+        self.assertEqual(extract_attributes('<e x="Fáilte 世界 \U0001f600">'), {'x': 'Fáilte 世界 \U0001f600'})
+        self.assertEqual(extract_attributes('<e x="décompose&#769;">'), {'x': 'décompose\u0301'})
+        # "Narrow" Python builds don't support unicode code points outside BMP.
+        try:
+            compat_chr(0x10000)
+            supports_outside_bmp = True
+        except ValueError:
+            supports_outside_bmp = False
+        if supports_outside_bmp:
+            self.assertEqual(extract_attributes('<e x="Smile &#128512;!">'), {'x': 'Smile \U0001f600!'})
 
     def test_clean_html(self):
         self.assertEqual(clean_html('a:\nb'), 'a: b')
@@ -614,7 +900,21 @@ class TestUtil(unittest.TestCase):
         self.assertEqual(parse_filesize('2 MiB'), 2097152)
         self.assertEqual(parse_filesize('5 GB'), 5000000000)
         self.assertEqual(parse_filesize('1.2Tb'), 1200000000000)
+        self.assertEqual(parse_filesize('1.2tb'), 1200000000000)
         self.assertEqual(parse_filesize('1,24 KB'), 1240)
+        self.assertEqual(parse_filesize('1,24 kb'), 1240)
+        self.assertEqual(parse_filesize('8.5 megabytes'), 8500000)
+
+    def test_parse_count(self):
+        self.assertEqual(parse_count(None), None)
+        self.assertEqual(parse_count(''), None)
+        self.assertEqual(parse_count('0'), 0)
+        self.assertEqual(parse_count('1000'), 1000)
+        self.assertEqual(parse_count('1.000'), 1000)
+        self.assertEqual(parse_count('1.1k'), 1100)
+        self.assertEqual(parse_count('1.1kk'), 1100000)
+        self.assertEqual(parse_count('1.1kk '), 1100000)
+        self.assertEqual(parse_count('1.1kk views'), 1100000)
 
     def test_version_tuple(self):
         self.assertEqual(version_tuple('1'), (1,))
@@ -754,6 +1054,7 @@ The first line
         self.assertEqual(cli_option({'proxy': '127.0.0.1:3128'}, '--proxy', 'proxy'), ['--proxy', '127.0.0.1:3128'])
         self.assertEqual(cli_option({'proxy': None}, '--proxy', 'proxy'), [])
         self.assertEqual(cli_option({}, '--proxy', 'proxy'), [])
+        self.assertEqual(cli_option({'retries': 10}, '--retries', 'retries'), ['--retries', '10'])
 
     def test_cli_valueless_option(self):
         self.assertEqual(cli_valueless_option(
@@ -813,6 +1114,45 @@ The first line
 
         self.assertRaises(ValueError, encode_base_n, 0, 70)
         self.assertRaises(ValueError, encode_base_n, 0, 60, custom_table)
+
+    def test_urshift(self):
+        self.assertEqual(urshift(3, 1), 1)
+        self.assertEqual(urshift(-3, 1), 2147483646)
+
+    def test_get_element_by_class(self):
+        html = '''
+            <span class="foo bar">nice</span>
+        '''
+
+        self.assertEqual(get_element_by_class('foo', html), 'nice')
+        self.assertEqual(get_element_by_class('no-such-class', html), None)
+
+    def test_get_element_by_attribute(self):
+        html = '''
+            <span class="foo bar">nice</span>
+        '''
+
+        self.assertEqual(get_element_by_attribute('class', 'foo bar', html), 'nice')
+        self.assertEqual(get_element_by_attribute('class', 'foo', html), None)
+        self.assertEqual(get_element_by_attribute('class', 'no-such-foo', html), None)
+
+    def test_get_elements_by_class(self):
+        html = '''
+            <span class="foo bar">nice</span><span class="foo bar">also nice</span>
+        '''
+
+        self.assertEqual(get_elements_by_class('foo', html), ['nice', 'also nice'])
+        self.assertEqual(get_elements_by_class('no-such-class', html), [])
+
+    def test_get_elements_by_attribute(self):
+        html = '''
+            <span class="foo bar">nice</span><span class="foo bar">also nice</span>
+        '''
+
+        self.assertEqual(get_elements_by_attribute('class', 'foo bar', html), ['nice', 'also nice'])
+        self.assertEqual(get_elements_by_attribute('class', 'foo', html), [])
+        self.assertEqual(get_elements_by_attribute('class', 'no-such-foo', html), [])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -15,7 +15,7 @@ from ..utils import (
 
 
 class ViideaIE(InfoExtractor):
-    _VALID_URL = r'''(?x)http://(?:www\.)?(?:
+    _VALID_URL = r'''(?x)https?://(?:www\.)?(?:
             videolectures\.net|
             flexilearn\.viidea\.net|
             presentations\.ocwconsortium\.org|
@@ -40,7 +40,7 @@ class ViideaIE(InfoExtractor):
             'ext': 'mp4',
             'title': 'Automatics, robotics and biocybernetics',
             'description': 'md5:815fc1deb6b3a2bff99de2d5325be482',
-            'thumbnail': 're:http://.*\.jpg',
+            'thumbnail': r're:http://.*\.jpg',
             'timestamp': 1372349289,
             'upload_date': '20130627',
             'duration': 565,
@@ -58,7 +58,7 @@ class ViideaIE(InfoExtractor):
             'ext': 'flv',
             'title': 'NLP at Google',
             'description': 'md5:fc7a6d9bf0302d7cc0e53f7ca23747b3',
-            'thumbnail': 're:http://.*\.jpg',
+            'thumbnail': r're:http://.*\.jpg',
             'timestamp': 1284375600,
             'upload_date': '20100913',
             'duration': 5352,
@@ -74,7 +74,7 @@ class ViideaIE(InfoExtractor):
             'id': '23181',
             'title': 'Deep Learning Summer School, Montreal 2015',
             'description': 'md5:0533a85e4bd918df52a01f0e1ebe87b7',
-            'thumbnail': 're:http://.*\.jpg',
+            'thumbnail': r're:http://.*\.jpg',
             'timestamp': 1438560000,
         },
         'playlist_count': 30,
@@ -85,7 +85,7 @@ class ViideaIE(InfoExtractor):
             'id': '9737',
             'display_id': 'mlss09uk_bishop_ibi',
             'title': 'Introduction To Bayesian Inference',
-            'thumbnail': 're:http://.*\.jpg',
+            'thumbnail': r're:http://.*\.jpg',
             'timestamp': 1251622800,
         },
         'playlist': [{
@@ -94,7 +94,7 @@ class ViideaIE(InfoExtractor):
                 'display_id': 'mlss09uk_bishop_ibi_part1',
                 'ext': 'wmv',
                 'title': 'Introduction To Bayesian Inference (Part 1)',
-                'thumbnail': 're:http://.*\.jpg',
+                'thumbnail': r're:http://.*\.jpg',
                 'duration': 4622,
                 'timestamp': 1251622800,
                 'upload_date': '20090830',
@@ -105,7 +105,7 @@ class ViideaIE(InfoExtractor):
                 'display_id': 'mlss09uk_bishop_ibi_part2',
                 'ext': 'wmv',
                 'title': 'Introduction To Bayesian Inference (Part 2)',
-                'thumbnail': 're:http://.*\.jpg',
+                'thumbnail': r're:http://.*\.jpg',
                 'duration': 5641,
                 'timestamp': 1251622800,
                 'upload_date': '20090830',
@@ -151,6 +151,7 @@ class ViideaIE(InfoExtractor):
                 smil_url = '%s/%s/video/%s/smil.xml' % (base_url, lecture_slug, part_id)
                 smil = self._download_smil(smil_url, lecture_id)
                 info = self._parse_smil(smil, smil_url, lecture_id)
+                self._sort_formats(info['formats'])
                 info['id'] = lecture_id if not multipart else '%s_part%s' % (lecture_id, part_id)
                 info['display_id'] = lecture_slug if not multipart else '%s_part%s' % (lecture_slug, part_id)
                 if multipart:

@@ -9,7 +9,7 @@ from ..compat import compat_urllib_parse_unquote_plus
 
 
 class YnetIE(InfoExtractor):
-    _VALID_URL = r'http://(?:.+?\.)?ynet\.co\.il/(?:.+?/)?0,7340,(?P<id>L(?:-[0-9]+)+),00\.html'
+    _VALID_URL = r'https?://(?:.+?\.)?ynet\.co\.il/(?:.+?/)?0,7340,(?P<id>L(?:-[0-9]+)+),00\.html'
     _TESTS = [
         {
             'url': 'http://hot.ynet.co.il/home/0,7340,L-11659-99244,00.html',
@@ -17,7 +17,7 @@ class YnetIE(InfoExtractor):
                 'id': 'L-11659-99244',
                 'ext': 'flv',
                 'title': 'איש לא יודע מאיפה באנו',
-                'thumbnail': 're:^https?://.*\.jpg',
+                'thumbnail': r're:^https?://.*\.jpg',
             }
         }, {
             'url': 'http://hot.ynet.co.il/home/0,7340,L-8859-84418,00.html',
@@ -25,7 +25,7 @@ class YnetIE(InfoExtractor):
                 'id': 'L-8859-84418',
                 'ext': 'flv',
                 'title': "צפו: הנשיקה הלוהטת של תורגי' ויוליה פלוטקין",
-                'thumbnail': 're:^https?://.*\.jpg',
+                'thumbnail': r're:^https?://.*\.jpg',
             }
         }
     ]
@@ -41,10 +41,12 @@ class YnetIE(InfoExtractor):
         m = re.search(r'ynet - HOT -- (["\']+)(?P<title>.+?)\1', title)
         if m:
             title = m.group('title')
+        formats = self._extract_f4m_formats(f4m_url, video_id)
+        self._sort_formats(formats)
 
         return {
             'id': video_id,
             'title': title,
-            'formats': self._extract_f4m_formats(f4m_url, video_id),
+            'formats': formats,
             'thumbnail': self._og_search_thumbnail(webpage),
         }

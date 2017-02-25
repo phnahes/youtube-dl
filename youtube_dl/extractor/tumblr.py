@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# coding: utf-8
 from __future__ import unicode_literals
 
 import re
@@ -8,7 +8,7 @@ from ..utils import int_or_none
 
 
 class TumblrIE(InfoExtractor):
-    _VALID_URL = r'http://(?P<blog_name>.*?)\.tumblr\.com/(?:post|video)/(?P<id>[0-9]+)(?:$|[/?#])'
+    _VALID_URL = r'https?://(?P<blog_name>[^/?#&]+)\.tumblr\.com/(?:post|video)/(?P<id>[0-9]+)(?:$|[/?#])'
     _TESTS = [{
         'url': 'http://tatianamaslanydaily.tumblr.com/post/54196191430/orphan-black-dvd-extra-behind-the-scenes',
         'md5': '479bb068e5b16462f5176a6828829767',
@@ -17,7 +17,7 @@ class TumblrIE(InfoExtractor):
             'ext': 'mp4',
             'title': 'tatiana maslany news, Orphan Black || DVD extra - behind the scenes ↳...',
             'description': 'md5:37db8211e40b50c7c44e95da14f630b7',
-            'thumbnail': 're:http://.*\.jpg',
+            'thumbnail': r're:http://.*\.jpg',
         }
     }, {
         'url': 'http://5sostrum.tumblr.com/post/90208453769/yall-forgetting-the-greatest-keek-of-them-all',
@@ -27,7 +27,7 @@ class TumblrIE(InfoExtractor):
             'ext': 'mp4',
             'title': '5SOS STRUM ;]',
             'description': 'md5:dba62ac8639482759c8eb10ce474586a',
-            'thumbnail': 're:http://.*\.jpg',
+            'thumbnail': r're:http://.*\.jpg',
         }
     }, {
         'url': 'http://hdvideotest.tumblr.com/post/130323439814/test-description-for-my-hd-video',
@@ -37,7 +37,7 @@ class TumblrIE(InfoExtractor):
             'ext': 'mp4',
             'title': 'HD Video Testing \u2014 Test description for my HD video',
             'description': 'md5:97cc3ab5fcd27ee4af6356701541319c',
-            'thumbnail': 're:http://.*\.jpg',
+            'thumbnail': r're:http://.*\.jpg',
         },
         'params': {
             'format': 'hd',
@@ -67,6 +67,34 @@ class TumblrIE(InfoExtractor):
             'uploader_id': 'user32021558',
         },
         'add_ie': ['Vimeo'],
+    }, {
+        'url': 'http://sutiblr.tumblr.com/post/139638707273',
+        'md5': '2dd184b3669e049ba40563a7d423f95c',
+        'info_dict': {
+            'id': 'ir7qBEIKqvq',
+            'ext': 'mp4',
+            'title': 'Vine by sutiblr',
+            'alt_title': 'Vine by sutiblr',
+            'uploader': 'sutiblr',
+            'uploader_id': '1198993975374495744',
+            'upload_date': '20160220',
+            'like_count': int,
+            'comment_count': int,
+            'repost_count': int,
+        },
+        'add_ie': ['Vine'],
+    }, {
+        'url': 'http://vitasidorkina.tumblr.com/post/134652425014/joskriver-victoriassecret-invisibility-or',
+        'md5': '01c12ceb82cbf6b2fe0703aa56b3ad72',
+        'info_dict': {
+            'id': '-7LnUPGlSo',
+            'ext': 'mp4',
+            'title': 'Video by victoriassecret',
+            'description': 'Invisibility or flight…which superpower would YOU choose? #VSFashionShow #ThisOrThat',
+            'uploader_id': 'victoriassecret',
+            'thumbnail': r're:^https?://.*\.jpg'
+        },
+        'add_ie': ['Instagram'],
     }]
 
     def _real_extract(self, url):

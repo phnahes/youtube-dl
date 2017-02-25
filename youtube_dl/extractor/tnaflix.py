@@ -10,6 +10,7 @@ from ..utils import (
     int_or_none,
     parse_duration,
     str_to_int,
+    unescapeHTML,
     xpath_text,
 )
 
@@ -76,7 +77,12 @@ class TNAFlixNetworkBaseIE(InfoExtractor):
         webpage = self._download_webpage(url, display_id)
 
         cfg_url = self._proto_relative_url(self._html_search_regex(
-            self._CONFIG_REGEX, webpage, 'flashvars.config'), 'http:')
+            self._CONFIG_REGEX, webpage, 'flashvars.config', default=None), 'http:')
+
+        if not cfg_url:
+            inputs = self._hidden_inputs(webpage)
+            cfg_url = ('https://cdn-fck.tnaflix.com/tnaflix/%s.fid?key=%s&VID=%s&premium=1&vip=1&alpha'
+                       % (inputs['vkey'], inputs['nkey'], video_id))
 
         cfg_xml = self._download_xml(
             cfg_url, display_id, 'Downloading metadata',
@@ -85,7 +91,7 @@ class TNAFlixNetworkBaseIE(InfoExtractor):
         formats = []
 
         def extract_video_url(vl):
-            return re.sub('speed=\d+', 'speed=', vl.text)
+            return re.sub(r'speed=\d+', 'speed=', unescapeHTML(vl.text))
 
         video_link = cfg_xml.find('./videoLink')
         if video_link is not None:
@@ -114,8 +120,12 @@ class TNAFlixNetworkBaseIE(InfoExtractor):
             xpath_text(cfg_xml, './startThumb', 'thumbnail'), 'http:')
         thumbnails = self._extract_thumbnails(cfg_xml)
 
-        title = self._html_search_regex(
-            self._TITLE_REGEX, webpage, 'title') if self._TITLE_REGEX else self._og_search_title(webpage)
+        title = None
+        if self._TITLE_REGEX:
+            title = self._html_search_regex(
+                self._TITLE_REGEX, webpage, 'title', default=None)
+        if not title:
+            title = self._og_search_title(webpage)
 
         age_limit = self._rta_search(webpage) or 18
 
@@ -132,7 +142,7 @@ class TNAFlixNetworkBaseIE(InfoExtractor):
         average_rating = float_or_none(extract_field(self._AVERAGE_RATING_REGEX, 'average rating'))
 
         categories_str = extract_field(self._CATEGORIES_REGEX, 'categories')
-        categories = categories_str.split(', ') if categories_str is not None else []
+        categories = [c.strip() for c in categories_str.split(',')] if categories_str is not None else []
 
         return {
             'id': video_id,
@@ -164,7 +174,7 @@ class TNAFlixNetworkEmbedIE(TNAFlixNetworkBaseIE):
             'display_id': '6538',
             'ext': 'mp4',
             'title': 'Educational xxx video',
-            'thumbnail': 're:https?://.*\.jpg$',
+            'thumbnail': r're:https?://.*\.jpg$',
             'age_limit': 18,
         },
         'params': {
@@ -185,9 +195,10 @@ class TNAFlixNetworkEmbedIE(TNAFlixNetworkBaseIE):
 class TNAFlixIE(TNAFlixNetworkBaseIE):
     _VALID_URL = r'https?://(?:www\.)?tnaflix\.com/[^/]+/(?P<display_id>[^/]+)/video(?P<id>\d+)'
 
-    _TITLE_REGEX = r'<title>(.+?) - TNAFlix Porn Videos</title>'
-    _DESCRIPTION_REGEX = r'<h3 itemprop="description">([^<]+)</h3>'
-    _UPLOADER_REGEX = r'(?s)<span[^>]+class="infoTitle"[^>]*>Uploaded By:</span>(.+?)<div'
+    _TITLE_REGEX = r'<title>(.+?) - (?:TNAFlix Porn Videos|TNAFlix\.com)</title>'
+    _DESCRIPTION_REGEX = r'(?s)>Description:</[^>]+>(.+?)<'
+    _UPLOADER_REGEX = r'<i>\s*Verified Member\s*</i>\s*<h\d+>(.+?)<'
+    _CATEGORIES_REGEX = r'(?s)<span[^>]*>Categories:</span>(.+?)</div>'
 
     _TESTS = [{
         # anonymous uploader, no categories
@@ -198,11 +209,10 @@ class TNAFlixIE(TNAFlixNetworkBaseIE):
             'display_id': 'Carmella-Decesare-striptease',
             'ext': 'mp4',
             'title': 'Carmella Decesare - striptease',
-            'thumbnail': 're:https?://.*\.jpg$',
+            'thumbnail': r're:https?://.*\.jpg$',
             'duration': 91,
             'age_limit': 18,
-            'uploader': 'Anonymous',
-            'categories': [],
+            'categories': ['Porn Stars'],
         }
     }, {
         # non-anonymous uploader, categories
@@ -214,7 +224,7 @@ class TNAFlixIE(TNAFlixNetworkBaseIE):
             'ext': 'mp4',
             'title': 'Educational xxx video',
             'description': 'md5:b4fab8f88a8621c8fabd361a173fe5b8',
-            'thumbnail': 're:https?://.*\.jpg$',
+            'thumbnail': r're:https?://.*\.jpg$',
             'duration': 164,
             'age_limit': 18,
             'uploader': 'bobwhite39',
@@ -240,7 +250,7 @@ class EMPFlixIE(TNAFlixNetworkBaseIE):
             'ext': 'mp4',
             'title': 'Amateur Finger Fuck',
             'description': 'Amateur solo finger fucking.',
-            'thumbnail': 're:https?://.*\.jpg$',
+            'thumbnail': r're:https?://.*\.jpg$',
             'duration': 83,
             'age_limit': 18,
             'uploader': 'cwbike',
@@ -270,7 +280,7 @@ class MovieFapIE(TNAFlixNetworkBaseIE):
             'ext': 'mp4',
             'title': 'Experienced MILF Amazing Handjob',
             'description': 'Experienced MILF giving an Amazing Handjob',
-            'thumbnail': 're:https?://.*\.jpg$',
+            'thumbnail': r're:https?://.*\.jpg$',
             'age_limit': 18,
             'uploader': 'darvinfred06',
             'view_count': int,
@@ -288,7 +298,7 @@ class MovieFapIE(TNAFlixNetworkBaseIE):
             'ext': 'flv',
             'title': 'Jeune Couple Russe',
             'description': 'Amateur',
-            'thumbnail': 're:https?://.*\.jpg$',
+            'thumbnail': r're:https?://.*\.jpg$',
             'age_limit': 18,
             'uploader': 'whiskeyjar',
             'view_count': int,

@@ -6,16 +6,14 @@ import hashlib
 import re
 
 from .common import InfoExtractor
-from ..compat import (
-    compat_str,
-    compat_urllib_parse,
-)
+from ..compat import compat_str
 from ..utils import (
-    int_or_none,
-    float_or_none,
-    sanitized_Request,
-    xpath_text,
     ExtractorError,
+    float_or_none,
+    int_or_none,
+    sanitized_Request,
+    urlencode_postdata,
+    xpath_text,
 )
 
 
@@ -32,7 +30,7 @@ class AtresPlayerIE(InfoExtractor):
                 'title': 'Especial Solidario de Nochebuena',
                 'description': 'md5:e2d52ff12214fa937107d21064075bf1',
                 'duration': 5527.6,
-                'thumbnail': 're:^https?://.*\.jpg$',
+                'thumbnail': r're:^https?://.*\.jpg$',
             },
             'skip': 'This video is only available for registered users'
         },
@@ -45,7 +43,7 @@ class AtresPlayerIE(InfoExtractor):
                 'title': 'David Bustamante',
                 'description': 'md5:f33f1c0a05be57f6708d4dd83a3b81c6',
                 'duration': 1439.0,
-                'thumbnail': 're:^https?://.*\.jpg$',
+                'thumbnail': r're:^https?://.*\.jpg$',
             },
         },
         {
@@ -86,7 +84,7 @@ class AtresPlayerIE(InfoExtractor):
         }
 
         request = sanitized_Request(
-            self._LOGIN_URL, compat_urllib_parse.urlencode(login_form).encode('utf-8'))
+            self._LOGIN_URL, urlencode_postdata(login_form))
         request.add_header('Content-Type', 'application/x-www-form-urlencoded')
         response = self._download_webpage(
             request, None, 'Logging in as %s' % username)

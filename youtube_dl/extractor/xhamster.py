@@ -4,44 +4,65 @@ import re
 
 from .common import InfoExtractor
 from ..utils import (
-    float_or_none,
+    dict_get,
+    ExtractorError,
     int_or_none,
+    parse_duration,
     unified_strdate,
 )
 
 
 class XHamsterIE(InfoExtractor):
-    _VALID_URL = r'(?P<proto>https?)://(?:.+?\.)?xhamster\.com/movies/(?P<id>[0-9]+)/(?P<seo>.+?)\.html(?:\?.*)?'
-    _TESTS = [
-        {
-            'url': 'http://xhamster.com/movies/1509445/femaleagent_shy_beauty_takes_the_bait.html',
-            'info_dict': {
-                'id': '1509445',
-                'ext': 'mp4',
-                'title': 'FemaleAgent Shy beauty takes the bait',
-                'upload_date': '20121014',
-                'uploader': 'Ruseful2011',
-                'duration': 893.52,
-                'age_limit': 18,
-            }
+    _VALID_URL = r'(?P<proto>https?)://(?:.+?\.)?xhamster\.com/movies/(?P<id>[0-9]+)/(?P<seo>.*?)\.html(?:\?.*)?'
+    _TESTS = [{
+        'url': 'http://xhamster.com/movies/1509445/femaleagent_shy_beauty_takes_the_bait.html',
+        'md5': '8281348b8d3c53d39fffb377d24eac4e',
+        'info_dict': {
+            'id': '1509445',
+            'ext': 'mp4',
+            'title': 'FemaleAgent Shy beauty takes the bait',
+            'upload_date': '20121014',
+            'uploader': 'Ruseful2011',
+            'duration': 893,
+            'age_limit': 18,
         },
-        {
-            'url': 'http://xhamster.com/movies/2221348/britney_spears_sexy_booty.html?hd',
-            'info_dict': {
-                'id': '2221348',
-                'ext': 'mp4',
-                'title': 'Britney Spears  Sexy Booty',
-                'upload_date': '20130914',
-                'uploader': 'jojo747400',
-                'duration': 200.48,
-                'age_limit': 18,
-            }
+    }, {
+        'url': 'http://xhamster.com/movies/2221348/britney_spears_sexy_booty.html?hd',
+        'info_dict': {
+            'id': '2221348',
+            'ext': 'mp4',
+            'title': 'Britney Spears  Sexy Booty',
+            'upload_date': '20130914',
+            'uploader': 'jojo747400',
+            'duration': 200,
+            'age_limit': 18,
         },
-        {
-            'url': 'https://xhamster.com/movies/2272726/amber_slayed_by_the_knight.html',
-            'only_matching': True,
+        'params': {
+            'skip_download': True,
         },
-    ]
+    }, {
+        # empty seo
+        'url': 'http://xhamster.com/movies/5667973/.html',
+        'info_dict': {
+            'id': '5667973',
+            'ext': 'mp4',
+            'title': '....',
+            'upload_date': '20160208',
+            'uploader': 'parejafree',
+            'duration': 72,
+            'age_limit': 18,
+        },
+        'params': {
+            'skip_download': True,
+        },
+    }, {
+        'url': 'https://xhamster.com/movies/2272726/amber_slayed_by_the_knight.html',
+        'only_matching': True,
+    }, {
+        # This video is visible for marcoalfa123456's friends only
+        'url': 'https://it.xhamster.com/movies/7263980/la_mia_vicina.html',
+        'only_matching': True,
+    }]
 
     def _real_extract(self, url):
         def extract_video_url(webpage, name):
@@ -61,6 +82,12 @@ class XHamsterIE(InfoExtractor):
         proto = mobj.group('proto')
         mrss_url = '%s://xhamster.com/movies/%s/%s.html' % (proto, video_id, seo)
         webpage = self._download_webpage(mrss_url, video_id)
+
+        error = self._html_search_regex(
+            r'<div[^>]+id=["\']videoClosed["\'][^>]*>(.+?)</div>',
+            webpage, 'error', default=None)
+        if error:
+            raise ExtractorError(error, expected=True)
 
         title = self._html_search_regex(
             [r'<h1[^>]*>([^<]+)</h1>',
@@ -85,9 +112,9 @@ class XHamsterIE(InfoExtractor):
              r'''<video[^>]+poster=(?P<q>["'])(?P<thumbnail>.+?)(?P=q)[^>]*>'''],
             webpage, 'thumbnail', fatal=False, group='thumbnail')
 
-        duration = float_or_none(self._search_regex(
-            r'(["\'])duration\1\s*:\s*(["\'])(?P<duration>.+?)\2',
-            webpage, 'duration', fatal=False, group='duration'))
+        duration = parse_duration(self._search_regex(
+            r'Runtime:\s*</span>\s*([\d:]+)', webpage,
+            'duration', fatal=False))
 
         view_count = int_or_none(self._search_regex(
             r'content=["\']User(?:View|Play)s:(\d+)',
@@ -169,7 +196,13 @@ class XHamsterEmbedIE(InfoExtractor):
         webpage = self._download_webpage(url, video_id)
 
         video_url = self._search_regex(
-            r'href="(https?://xhamster\.com/movies/%s/[^"]+\.html[^"]*)"' % video_id,
-            webpage, 'xhamster url')
+            r'href="(https?://xhamster\.com/movies/%s/[^"]*\.html[^"]*)"' % video_id,
+            webpage, 'xhamster url', default=None)
+
+        if not video_url:
+            vars = self._parse_json(
+                self._search_regex(r'vars\s*:\s*({.+?})\s*,\s*\n', webpage, 'vars'),
+                video_id)
+            video_url = dict_get(vars, ('downloadLink', 'homepageLink', 'commentsLink', 'shareUrl'))
 
         return self.url_result(video_url, 'XHamster')

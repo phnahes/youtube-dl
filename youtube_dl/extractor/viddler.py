@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 
 from .common import InfoExtractor
 from ..compat import (
-    compat_urllib_parse,
+    compat_urllib_parse_urlencode,
     compat_urlparse,
 )
 from ..utils import (
@@ -26,7 +26,7 @@ class ViddlerIE(InfoExtractor):
             'timestamp': 1335371429,
             'upload_date': '20120425',
             'duration': 100.89,
-            'thumbnail': 're:^https?://.*\.jpg$',
+            'thumbnail': r're:^https?://.*\.jpg$',
             'view_count': int,
             'comment_count': int,
             'categories': ['video content', 'high quality video', 'video made easy', 'how to produce video with limited resources', 'viddler'],
@@ -93,7 +93,7 @@ class ViddlerIE(InfoExtractor):
         headers = {'Referer': 'http://static.cdn-ec.viddler.com/js/arpeggio/v2/embed.html'}
         request = sanitized_Request(
             'http://api.viddler.com/api/v2/viddler.videos.getPlaybackDetails.json?%s'
-            % compat_urllib_parse.urlencode(query), None, headers)
+            % compat_urllib_parse_urlencode(query), None, headers)
         data = self._download_json(request, video_id)['video']
 
         formats = []
